@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { getRandomInterviewCover } from '@/lib/utils';
 import { Button } from './ui/button';
 import Link from 'next/link';
+import DisplayTechIcons from './DisplayTechIcons';
 
 const InterviewCard = ({interviewId, userId, role, techstack, type, createdAt} : InterviewCardProps) => {
     const feedback = null as Feedback | null;
@@ -18,7 +19,7 @@ const InterviewCard = ({interviewId, userId, role, techstack, type, createdAt} :
                         <p className="badge-text">{ normalizedType }</p>
                     </div>
                     <Image src={getRandomInterviewCover()} alt='cover image' width={90} height={90} className='rounded-full object-fit size-[60px]'/>
-                    <h3 className='mt-5 capitalize text-xl'>
+                    <h3 className='mt-5 capitalize text-2xl font-bold'>
                         {role} Interview
                     </h3>
                     <div className='flex flex-row gap-5 mt-3 '>
@@ -36,7 +37,7 @@ const InterviewCard = ({interviewId, userId, role, techstack, type, createdAt} :
                     </p>
                 </div>
                 <div className='flex flex-row justify-between '>
-                    <p>Tech Icons</p>
+                    <DisplayTechIcons techStack={techstack}/>
                     <Button className='btn-primary'>
                         <Link href={feedback ? `/interview/${interviewId}/feedback` : `/interview/${interviewId}`}>
                             {feedback ? 'Check Feedback' : 'View Interview'}

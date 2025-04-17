@@ -262,7 +262,7 @@
   }
 
   .root-layout {
-    @apply flex mx-auto max-w-7xl flex-col gap-12 my-12 px-16 max-sm:px-4 max-sm:my-8;
+    @apply flex mx-auto max-w-7xl flex-col gap-8 my-6 px-16 max-sm:px-4 max-sm:my-8;
   }
 
   .card-cta {
@@ -286,7 +286,7 @@
   }
 
   .card-interview {
-    @apply dark-gradient rounded-2xl min-h-full flex flex-col p-6 relative overflow-hidden gap-10 justify-between;
+    @apply dark-gradient rounded-2xl min-h-[80px] flex flex-col p-6 relative overflow-hidden gap-8 justify-between;
 
     .badge-text {
       @apply text-sm font-semibold capitalize;

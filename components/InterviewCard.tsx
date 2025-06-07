@@ -6,8 +6,8 @@ import { Button } from './ui/button';
 import Link from 'next/link';
 import DisplayTechIcons from './DisplayTechIcons';
 
-const InterviewCard = ({interviewId, userId, role, techstack, type, createdAt} : InterviewCardProps) => {
-    const feedback = null as Feedback | null;
+const InterviewCard = ({interviewId, userId, role, techstack, type, createdAt, feedback} : InterviewCardProps) => {
+    // Accept feedback as a prop instead of setting it to null
     const normalizedType = /mix/gi.test(type) ? 'Mixed' : type;
     const formattedDate = dayjs(feedback?.createdAt || createdAt || Date.now()).format('MMM D, YYYY');
 
@@ -33,7 +33,7 @@ const InterviewCard = ({interviewId, userId, role, techstack, type, createdAt} :
                         </div>
                     </div>
                     <p className='line-clamp-2 mt-5 text-sm'>
-                        {feedback?.finalAssessment || "You haven't taken an Interview yet. Take it now to imporve your skill" }
+                        {feedback?.finalAssessment || "You haven't taken an Interview yet. Take it now to improve your skills" }
                     </p>
                 </div>
                 <div className='flex flex-row justify-between '>
@@ -43,7 +43,6 @@ const InterviewCard = ({interviewId, userId, role, techstack, type, createdAt} :
                             {feedback ? 'Check Feedback' : 'View Interview'}
                         </Link>
                     </Button>
-
                 </div>
             </div>
         </div>

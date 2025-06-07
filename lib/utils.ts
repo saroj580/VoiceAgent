@@ -8,16 +8,28 @@ export function cn(...inputs: ClassValue[]) {
 
 const techIconBaseURL = "https://cdn.jsdelivr.net/gh/devicons/devicon/icons";
 
+// Cache for icon existence checks to avoid redundant network requests
+const iconExistenceCache: Record<string, boolean> = {};
+
 const normalizeTechName = (tech: string) => {
   const key = tech.toLowerCase().replace(/\.js$/, "").replace(/\s+/g, "");
   return mappings[key as keyof typeof mappings];
 };
 
 const checkIconExists = async (url: string) => {
+  // Check cache first
+  if (iconExistenceCache[url] !== undefined) {
+    return iconExistenceCache[url];
+  }
+  
   try {
     const response = await fetch(url, { method: "HEAD" });
-    return response.ok; // Returns true if the icon exists
+    const exists = response.ok;
+    // Cache the result
+    iconExistenceCache[url] = exists;
+    return exists;
   } catch {
+    iconExistenceCache[url] = false;
     return false;
   }
 };

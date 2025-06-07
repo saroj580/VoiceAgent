@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { cn } from "@/lib/utils"
 import { useRouter } from 'next/navigation'
 import { vapi } from '@/lib/vapi.sdk';
@@ -11,7 +11,6 @@ type SavedMessage = {
     role: string;
     content: string;
 };
-
 
 enum CallStatus{
     INACTIVE = 'INACTIVE',
@@ -27,39 +26,67 @@ const Agent = ({ userName, userId, type }: AgentProps) => {
     const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
     const [errorMessage, setErrorMessage] = useState<string>("");
     const [messages, setMessages] = useState<SavedMessage[]>([]);
+    const messagesRef = useRef<SavedMessage[]>([]);
+    
+    // Track if component is mounted to prevent state updates after unmounting
+    const isMounted = useRef(true);
 
+    // Store messages in ref to access in cleanup
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
 
     useEffect(() => {
+        // Set mounted flag
+        isMounted.current = true;
+        
         const onCallStart = () => {
+            if (!isMounted.current) return;
             setCallStatus(CallStatus.ACTIVE);
             setErrorMessage("");
         };
         
         const onCallEnd = () => {
+            if (!isMounted.current) return;
             setCallStatus(CallStatus.FINISHED);
+            
+            // Save interview data if we have messages
+            if (messagesRef.current.length > 0 && type === "generate") {
+                saveInterviewData();
+            }
+            
             setTimeout(() => {
-                router.push('/');
+                if (isMounted.current) {
+                    router.push('/');
+                }
             }, 2000);
         };
 
         const onMessage = (message: Message) => {
+            if (!isMounted.current) return;
             if (message.type === 'transcript' && message.transcriptType === 'final') {
                 const newMessage = { role: message.role, content: message.transcript }
                 setMessages((prev) => [...prev, newMessage]);
-
             }
         }
 
-        const onSpeechStart = () => setIsSpeaking(true);
-        const onSpeechEnd = () => setIsSpeaking(false);
+        const onSpeechStart = () => {
+            if (!isMounted.current) return;
+            setIsSpeaking(true);
+        };
         
-
+        const onSpeechEnd = () => {
+            if (!isMounted.current) return;
+            setIsSpeaking(false);
+        };
+        
         const onError = (error: Error | any) => {
+            if (!isMounted.current) return;
             console.error('Vapi Error:', error);
             
             const errorMsg = typeof error === 'string' 
                 ? error 
-                : error?.message || 'Unknown error';
+                : error?.errorMsg || error?.message || 'Unknown error';
             
             const isEjectionError = 
                 errorMsg.includes('Meeting ended due to ejection') || 
@@ -70,13 +97,18 @@ const Agent = ({ userName, userId, type }: AgentProps) => {
                 setErrorMessage("Call disconnected: Session ended unexpectedly");
                 setCallStatus(CallStatus.ERROR);
                 
+                // Save interview data if we have messages before disconnection
+                if (messagesRef.current.length > 0 && type === "generate") {
+                    saveInterviewData();
+                }
+                
                 try {
                     vapi.stop();
                 } catch (e) {
                     console.log('Error stopping call:', e);
                 }
                 
-                toast.error("Call disconnected. Please try again later.");
+                toast.error("Call disconnected. Your progress has been saved.");
             } else {
                 setErrorMessage(`Error: ${errorMsg}`);
                 setCallStatus(CallStatus.ERROR);
@@ -85,6 +117,7 @@ const Agent = ({ userName, userId, type }: AgentProps) => {
         };
         
         const handleWindowError = (event: ErrorEvent) => {
+            if (!isMounted.current) return;
             if (event.message.includes('WebSocket') || 
                 event.message.includes('network') ||
                 event.message.includes('Meeting has ended') ||
@@ -92,6 +125,11 @@ const Agent = ({ userName, userId, type }: AgentProps) => {
                 console.log("Window error related to WebSocket:", event);
                 setErrorMessage("Connection error. Please try again.");
                 setCallStatus(CallStatus.ERROR);
+                
+                // Save interview data if we have messages before error
+                if (messagesRef.current.length > 0 && type === "generate") {
+                    saveInterviewData();
+                }
             }
         };
         
@@ -105,6 +143,7 @@ const Agent = ({ userName, userId, type }: AgentProps) => {
         vapi.on('error', onError);
 
         return () => {
+            isMounted.current = false;
             window.removeEventListener('error', handleWindowError);
             vapi.off('call-end', onCallEnd);
             vapi.off('call-start', onCallStart);
@@ -112,35 +151,97 @@ const Agent = ({ userName, userId, type }: AgentProps) => {
             vapi.off('speech-start', onSpeechStart);
             vapi.off('speech-end', onSpeechEnd);
             vapi.off('error', onError);
+            
+            // Clean up any active call when component unmounts
+            try {
+                vapi.stop();
+            } catch (e) {
+                console.log('Error stopping call on unmount:', e);
+            }
         }
-    },[])
+    }, []);
 
+    // Function to save interview data
+    const saveInterviewData = async () => {
+        if (messagesRef.current.length === 0 || !userId) return;
+        
+        try {
+            // Extract questions from AI messages
+            const aiMessages = messagesRef.current.filter(msg => msg.role === 'assistant');
+            const questions = aiMessages.map(msg => msg.content);
+            
+            if (questions.length === 0) return;
+            
+            // Create a basic interview object
+            const interviewData = {
+                type: "technical", // Default type
+                role: "Software Developer", // Default role
+                level: "Mid-level", // Default level
+                techstack: ["JavaScript", "React"], // Default tech stack
+                amount: questions.length,
+                userid: userId
+            };
+            
+            // Send to API to save
+            const response = await fetch('/api/vapi/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(interviewData),
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to save interview data');
+            }
+            
+            console.log('Interview data saved successfully');
+        } catch (error) {
+            console.error('Error saving interview data:', error);
+            toast.error("Failed to save interview data");
+        }
+    };
 
     useEffect(() => {
         if (callStatus === CallStatus.FINISHED) router.push('/');
-
-    },[messages, callStatus, userId, type])
+    }, [callStatus, router]);
 
     const handleCall = async () => {
         setCallStatus(CallStatus.CONNECTING);
-
-        await vapi.start(process.env.NEXT_PUBLIC_VAPI_WORKFLOW_ID!, {
-            variableValues: {
-                username: userName,
-                userid: userId,
-            }
-        })
+    
+        try {
+            await vapi.start(process.env.NEXT_PUBLIC_VAPI_WORKFLOW_ID!, {
+                variableValues: {
+                    username: userName,
+                    userid: userId,
+                }
+            });
+        } catch (error) {
+            console.error("Error starting call:", error);
+            setCallStatus(CallStatus.ERROR);
+            setErrorMessage("Failed to start call. Please try again.");
+        }
     }
 
     const handleDisconnect = async () => {
         setCallStatus(CallStatus.FINISHED);
-
-        vapi.stop();
+        
+        // Save interview data before disconnecting
+        if (messagesRef.current.length > 0 && type === "generate") {
+            await saveInterviewData();
+        }
+        
+        try {
+            vapi.stop();
+        } catch (e) {
+            console.log('Error stopping call:', e);
+        }
     }
 
     const latestMessage = messages[messages.length - 1]?.content;
     const isCallInactiveOrFinished = callStatus === CallStatus.INACTIVE || callStatus === CallStatus.FINISHED
 
+    // Rest of the component remains the same
     return (
         <>
             <div className='call-view'>

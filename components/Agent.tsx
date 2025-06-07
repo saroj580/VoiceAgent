@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { useRouter } from 'next/navigation'
 import { vapi } from '@/lib/vapi.sdk';
 import { toast } from 'sonner';
+import { interviewer } from '@/constants';
 
 type SavedMessage = {
     role: string;
@@ -20,7 +21,7 @@ enum CallStatus{
     ERROR = "ERROR"
 }
 
-const Agent = ({ userName, userId, type }: AgentProps) => {
+const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) => {
     const router = useRouter();
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
@@ -172,12 +173,85 @@ const Agent = ({ userName, userId, type }: AgentProps) => {
             
             if (questions.length === 0) return;
             
-            // Create a basic interview object
+            // Extract user messages for analysis
+            const userMessages = messagesRef.current.filter(msg => msg.role === 'user');
+            const userText = userMessages.map(msg => msg.content).join(' ').toLowerCase();
+            
+            // Extract role information
+            let role = "Software Developer"; // Default role
+            if (userText.includes('frontend') || userText.includes('front end') || userText.includes('front-end')) {
+                role = "Frontend Developer";
+            } else if (userText.includes('backend') || userText.includes('back end') || userText.includes('back-end')) {
+                role = "Backend Developer";
+            } else if (userText.includes('fullstack') || userText.includes('full stack') || userText.includes('full-stack')) {
+                role = "Full Stack Developer";
+            } else if (userText.includes('devops')) {
+                role = "DevOps Engineer";
+            } else if (userText.includes('data scientist') || userText.includes('data science')) {
+                role = "Data Scientist";
+            } else if (userText.includes('machine learning') || userText.includes('ml engineer')) {
+                role = "ML Engineer";
+            } else if (userText.includes('mobile')) {
+                role = "Mobile Developer";
+            }
+            
+            // Extract level information
+            let level = "Mid-level"; // Default level
+            if (userText.includes('junior') || userText.includes('entry') || userText.includes('beginner')) {
+                level = "Junior";
+            } else if (userText.includes('senior') || userText.includes('experienced') || userText.includes('expert')) {
+                level = "Senior";
+            } else if (userText.includes('lead') || userText.includes('principal')) {
+                level = "Lead";
+            }
+            
+            // Extract interview type
+            let type = "technical"; // Default type
+            if (userText.includes('behavioral') || userText.includes('behavioural') || userText.includes('soft skills')) {
+                type = "behavioral";
+            } else if (userText.includes('mixed') || userText.includes('both technical and behavioral')) {
+                type = "mixed";
+            }
+            
+            // Extract tech stack using mappings from constants/index.ts
+            const techstack = [];
+            const words = userText.split(/\s+/);
+            
+            // Check each word against mappings
+            for (const word of words) {
+                const cleanWord = word.replace(/[.,;:!?()]/g, '').toLowerCase();
+                if (mappings[cleanWord]) {
+                    const normalizedTech = mappings[cleanWord];
+                    if (!techstack.includes(normalizedTech)) {
+                        techstack.push(normalizedTech);
+                    }
+                }
+            }
+            
+            // Also check for multi-word tech stacks (e.g., "react js", "node js")
+            for (const key in mappings) {
+                if (key.includes('.') || key.includes(' ')) {
+                    const normalizedKey = key.toLowerCase();
+                    if (userText.includes(normalizedKey)) {
+                        const normalizedTech = mappings[key];
+                        if (!techstack.includes(normalizedTech)) {
+                            techstack.push(normalizedTech);
+                        }
+                    }
+                }
+            }
+            
+            // If no tech stack is detected, use default
+            if (techstack.length === 0) {
+                techstack.push("JavaScript", "React");
+            }
+            
+            // Create interview object with extracted data
             const interviewData = {
-                type: "technical", // Default type
-                role: "Software Developer", // Default role
-                level: "Mid-level", // Default level
-                techstack: ["JavaScript", "React"], // Default tech stack
+                type,
+                role,
+                level,
+                techstack,
                 amount: questions.length,
                 userid: userId
             };
@@ -202,25 +276,59 @@ const Agent = ({ userName, userId, type }: AgentProps) => {
         }
     };
 
+    
+
     useEffect(() => {
-        if (callStatus === CallStatus.FINISHED) router.push('/');
-    }, [callStatus, router]);
+        const handleGenerateFeedback = async (messages: SavedMessage[]) => {
+            console.log('Generate feedback here ...');
+
+
+            const { success, id } = {
+                success: true,
+                id : 'feedback-id'
+            }
+            if(success && id){
+                router.push(`/interview/${interviewId}/feedback`)
+            } else {
+                console.log("Error saving feedback");
+                router.push("/");
+            }
+        }
+
+        
+        if (callStatus === CallStatus.FINISHED) {
+            if (type === 'generate') {
+                router.push('/');
+            } else {
+                handleGenerateFeedback(messages);
+            }
+        }
+    }, [messages, callStatus, type, userId, router]);
+
+    
 
     const handleCall = async () => {
         setCallStatus(CallStatus.CONNECTING);
-    
-        try {
-            await vapi.start(process.env.NEXT_PUBLIC_VAPI_WORKFLOW_ID!, {
-                variableValues: {
-                    username: userName,
-                    userid: userId,
+
+            if (type === 'generate') {
+                await vapi.start(process.env.NEXT_PUBLIC_VAPI_WORKFLOW_ID!, {
+                    variableValues: {
+                        username: userName,
+                        userid: userId,
+                    }
+                });
+            } else {
+                let formattedQuestions = '';
+                if (questions) {
+                    formattedQuestions = questions.map((question) => `- ${question}\n`).join('\n');
                 }
-            });
-        } catch (error) {
-            console.error("Error starting call:", error);
-            setCallStatus(CallStatus.ERROR);
-            setErrorMessage("Failed to start call. Please try again.");
-        }
+
+                await vapi.start(interviewer, {
+                    variableValues: {
+                        questions: formattedQuestions,
+                    }
+                })
+            }
     }
 
     const handleDisconnect = async () => {

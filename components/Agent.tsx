@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react'
 import { cn } from "@/lib/utils"
 import { useRouter } from 'next/navigation'
 import { vapi } from '@/lib/vapi.sdk';
+import { toast } from 'sonner';
 
 type SavedMessage = {
     role: string;
@@ -16,21 +17,30 @@ enum CallStatus{
     INACTIVE = 'INACTIVE',
     CONNECTING = "CONNECTING",
     ACTIVE = "ACTIVE",
-    FINISHED = "FINISHED"
+    FINISHED = "FINISHED",
+    ERROR = "ERROR"
 }
 
 const Agent = ({ userName, userId, type }: AgentProps) => {
     const router = useRouter();
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
-
-
+    const [errorMessage, setErrorMessage] = useState<string>("");
     const [messages, setMessages] = useState<SavedMessage[]>([]);
 
 
     useEffect(() => {
-        const onCallStart = () => setCallStatus(CallStatus.ACTIVE);
-        const onCallEnd = () => setCallStatus(CallStatus.FINISHED);
+        const onCallStart = () => {
+            setCallStatus(CallStatus.ACTIVE);
+            setErrorMessage("");
+        };
+        
+        const onCallEnd = () => {
+            setCallStatus(CallStatus.FINISHED);
+            setTimeout(() => {
+                router.push('/');
+            }, 2000);
+        };
 
         const onMessage = (message: Message) => {
             if (message.type === 'transcript' && message.transcriptType === 'final') {
@@ -44,7 +54,48 @@ const Agent = ({ userName, userId, type }: AgentProps) => {
         const onSpeechEnd = () => setIsSpeaking(false);
         
 
-        const onError = (error : Error) => console.log('Error', error);
+        const onError = (error: Error | any) => {
+            console.error('Vapi Error:', error);
+            
+            const errorMsg = typeof error === 'string' 
+                ? error 
+                : error?.message || 'Unknown error';
+            
+            const isEjectionError = 
+                errorMsg.includes('Meeting ended due to ejection') || 
+                errorMsg.includes('Meeting has ended') ||
+                errorMsg.includes('disconnected');
+            
+            if (isEjectionError) {
+                setErrorMessage("Call disconnected: Session ended unexpectedly");
+                setCallStatus(CallStatus.ERROR);
+                
+                try {
+                    vapi.stop();
+                } catch (e) {
+                    console.log('Error stopping call:', e);
+                }
+                
+                toast.error("Call disconnected. Please try again later.");
+            } else {
+                setErrorMessage(`Error: ${errorMsg}`);
+                setCallStatus(CallStatus.ERROR);
+                toast.error("Call error. Please try again.");
+            }
+        };
+        
+        const handleWindowError = (event: ErrorEvent) => {
+            if (event.message.includes('WebSocket') || 
+                event.message.includes('network') ||
+                event.message.includes('Meeting has ended') ||
+                event.message.includes('Meeting ended due to ejection')) {
+                console.log("Window error related to WebSocket:", event);
+                setErrorMessage("Connection error. Please try again.");
+                setCallStatus(CallStatus.ERROR);
+            }
+        };
+        
+        window.addEventListener('error', handleWindowError);     
         
         vapi.on('call-start', onCallStart);
         vapi.on('call-end', onCallEnd);
@@ -54,6 +105,7 @@ const Agent = ({ userName, userId, type }: AgentProps) => {
         vapi.on('error', onError);
 
         return () => {
+            window.removeEventListener('error', handleWindowError);
             vapi.off('call-end', onCallEnd);
             vapi.off('call-start', onCallStart);
             vapi.off('message', onMessage);

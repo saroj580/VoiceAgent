@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { useRouter } from 'next/navigation'
 import { vapi } from '@/lib/vapi.sdk';
 import { toast } from 'sonner';
-import { interviewer } from '@/constants';
+import { interviewer, mappings } from '@/constants';
 
 type SavedMessage = {
     role: string;
@@ -193,6 +193,10 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
                 role = "ML Engineer";
             } else if (userText.includes('mobile')) {
                 role = "Mobile Developer";
+            } else if (userText.includes('content creator') || userText.includes('content') || userText.includes('contend developer')) {
+                role = "Content Creator"
+            } else if (userText.includes("marketing engineer") || userText.includes("marketing developer") || userText.includes("marketing")) {
+                role = "Marketing"
             }
             
             // Extract level information
@@ -214,29 +218,17 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
             }
             
             // Extract tech stack using mappings from constants/index.ts
-            const techstack = [];
-            const words = userText.split(/\s+/);
+            const techstack: string[] = [];
             
-            // Check each word against mappings
-            for (const word of words) {
-                const cleanWord = word.replace(/[.,;:!?()]/g, '').toLowerCase();
-                if (mappings[cleanWord]) {
-                    const normalizedTech = mappings[cleanWord];
+            for (const key in mappings) {
+                // Create a regex for the key, making it case-insensitive and matching whole words or common variations
+                // The regex now handles multi-word keys and special characters more robustly
+                const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Corrected escaping for regex special characters
+                const regex = new RegExp(`\\b${escapedKey}(?:\\s*js|\\s*developer)?\\b`, 'i');
+                if (regex.test(userText)) {
+                    const normalizedTech = mappings[key];
                     if (!techstack.includes(normalizedTech)) {
                         techstack.push(normalizedTech);
-                    }
-                }
-            }
-            
-            // Also check for multi-word tech stacks (e.g., "react js", "node js")
-            for (const key in mappings) {
-                if (key.includes('.') || key.includes(' ')) {
-                    const normalizedKey = key.toLowerCase();
-                    if (userText.includes(normalizedKey)) {
-                        const normalizedTech = mappings[key];
-                        if (!techstack.includes(normalizedTech)) {
-                            techstack.push(normalizedTech);
-                        }
                     }
                 }
             }

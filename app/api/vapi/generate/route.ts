@@ -19,10 +19,12 @@ export async function POST(request : Request) {
             }, { status: 400 });
         }
 
-        // Ensure techstack is a string before splitting
-        const techstackArray = typeof techstack === 'string' 
-            ? techstack.split(',') 
-            : Array.isArray(techstack) ? techstack : [];
+        // Ensure techstack is properly formatted as an array
+        const techstackArray = Array.isArray(techstack)
+            ? techstack
+            : typeof techstack === 'string'
+                ? techstack.split(',').map(tech => tech.trim())
+                : [];
 
         let parsedQuestions;
         

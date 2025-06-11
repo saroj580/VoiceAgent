@@ -12,22 +12,48 @@ const techIconBaseURL = "https://cdn.jsdelivr.net/gh/devicons/devicon/icons";
 const iconExistenceCache: Record<string, boolean> = {};
 
 const normalizeTechName = (tech: string) => {
-  const key = tech.toLowerCase().replace(/\.js$/, "").replace(/\s+/g, "");
-  const mapped = mappings[key as keyof typeof mappings];
+  // Ensure tech is a string before calling toLowerCase
+  const techString = typeof tech === 'string' ? tech : '';
+  console.log(`normalizeTechName input: "${techString}"`);
+
+  // First, try to find an exact match with the original case (for object mappings like "JavaScript", "Python")
+  let mapped = mappings[techString as keyof typeof mappings];
+  console.log(`Exact match for "${techString}":`, mapped);
+
+  // If no exact match, try lowercase version (for string mappings like "javascript": "javascript")
+  if (!mapped) {
+    const key = techString.toLowerCase().replace(/\.js$/, "").replace(/\s+/g, "");
+    mapped = mappings[key as keyof typeof mappings];
+    console.log(`Lowercase match for "${key}":`, mapped);
+  }
+
   if (typeof mapped === 'object' && mapped !== null && 'icon' in mapped) {
+    console.log(`Returning icon path: ${mapped.icon}`);
     return mapped.icon; // Return the direct icon path if available
   } else if (typeof mapped === 'string') {
+    console.log(`Returning normalized string: ${mapped}`);
     return mapped; // Return the normalized string for devicon URL construction
   } else {
-    return key; // Fallback to original key if no mapping found
+    // Fallback to lowercase key for devicon URL construction
+    const fallback = techString.toLowerCase().replace(/\.js$/, "").replace(/\s+/g, "");
+    console.log(`Returning fallback: ${fallback}`);
+    return fallback;
   }
 };
 
 export const getTechLogos = async (techArray: string[]) => {
-  const logoURLs = techArray.map((tech) => {
+  // Ensure techArray contains only strings
+  const validTechArray = techArray.filter(tech => typeof tech === 'string');
+
+  console.log('getTechLogos input:', techArray);
+  console.log('validTechArray:', validTechArray);
+
+  const logoURLs = validTechArray.map((tech) => {
     const normalized = normalizeTechName(tech);
+    console.log(`Tech: ${tech} -> Normalized: ${normalized}`);
     // If normalized is a direct icon path, use it. Otherwise, construct devicon URL.
     const url = normalized.startsWith('/') ? normalized : `${techIconBaseURL}/${normalized}/${normalized}-original.svg`;
+    console.log(`Final URL for ${tech}: ${url}`);
     return {
       tech,
       url,
@@ -41,6 +67,7 @@ export const getTechLogos = async (techArray: string[]) => {
     }))
   );
 
+  console.log('Final results:', results);
   return results;
 };
 

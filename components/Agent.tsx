@@ -219,23 +219,27 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
             
             // Extract tech stack using mappings from constants/index.ts
             const techstack: string[] = [];
-            
+
             for (const key in mappings) {
-                // Create a regex for the key, making it case-insensitive and matching whole words or common variations
-                // The regex now handles multi-word keys and special characters more robustly
-                const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Corrected escaping for regex special characters
+                const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const regex = new RegExp(`\\b${escapedKey}(?:\\s*js|\\s*developer)?\\b`, 'i');
                 if (regex.test(userText)) {
                     const normalizedTech = mappings[key];
-                    if (!techstack.includes(normalizedTech)) {
+                    // Handle both string and object mappings properly
+                    if (typeof normalizedTech === 'string' && !techstack.includes(normalizedTech)) {
                         techstack.push(normalizedTech);
+                    } else if (typeof normalizedTech === 'object' && normalizedTech !== null && 'keywords' in normalizedTech) {
+                        // For object mappings, use the key as the tech name (e.g., "JavaScript", "Python")
+                        if (!techstack.includes(key)) {
+                            techstack.push(key);
+                        }
                     }
                 }
             }
             
             // If no tech stack is detected, use default
             if (techstack.length === 0) {
-                techstack.push("JavaScript", "React");
+                techstack.push("JavaScript", "TypeScript");
             }
             
             // Create interview object with extracted data

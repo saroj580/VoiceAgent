@@ -101,7 +101,9 @@ export const mappings = {
   "digital marketing": "marketing",
   "seo": "marketing",
   "social media": "marketing",
-};
+  'c#': 'csharp.svg',
+  'c': 'c.svg',
+} as const;
 
 export const interviewer: CreateAssistantDTO = {
   name: "Interviewer",

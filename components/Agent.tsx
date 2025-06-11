@@ -20,7 +20,6 @@ enum CallStatus{
     FINISHED = "FINISHED",
     ERROR = "ERROR"
 }
-
 const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) => {
     const router = useRouter();
     const [isSpeaking, setIsSpeaking] = useState(false);
@@ -211,7 +210,7 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
             
             // Extract interview type
             let type = "technical"; // Default type
-            if (userText.includes('behavioral') || userText.includes('behavioural') || userText.includes('soft skills')) {
+            if (userText.includes('behavioral') || userText.includes('behavioural') || userText.includes('soft skills') || userText.match(/behavioral|personality|psychology/gi)){
                 type = "behavioral";
             } else if (userText.includes('mixed') || userText.includes('both technical and behavioral')) {
                 type = "mixed";
@@ -222,9 +221,9 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
 
             for (const key in mappings) {
                 const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const regex = new RegExp(`\\b${escapedKey}(?:\\s*js|\\s*developer)?\\b`, 'i');
+                const regex = new RegExp(`\\b${escapedKey}(?:s|js|developer)?\\b`, 'gi');
                 if (regex.test(userText)) {
-                    const normalizedTech = mappings[key];
+                    const normalizedTech = mappings[key as keyof typeof mappings];
                     // Handle both string and object mappings properly
                     if (typeof normalizedTech === 'string' && !techstack.includes(normalizedTech)) {
                         techstack.push(normalizedTech);

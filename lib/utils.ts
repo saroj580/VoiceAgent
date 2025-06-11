@@ -6,6 +6,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+interface TechLogo {
+    name: string;
+    icon: string;
+}
+
 const techIconBaseURL = "https://cdn.jsdelivr.net/gh/devicons/devicon/icons";
 
 // Cache for icon existence checks to avoid redundant network requests
@@ -28,8 +33,8 @@ const normalizeTechName = (tech: string) => {
   }
 
   if (typeof mapped === 'object' && mapped !== null && 'icon' in mapped) {
-    console.log(`Returning icon path: ${mapped.icon}`);
-    return mapped.icon; // Return the direct icon path if available
+    console.log(`Returning icon path: ${(mapped as { icon: string }).icon}`);
+    return (mapped as { icon: string }).icon;
   } else if (typeof mapped === 'string') {
     console.log(`Returning normalized string: ${mapped}`);
     return mapped; // Return the normalized string for devicon URL construction
@@ -93,3 +98,21 @@ export const getRandomInterviewCover = () => {
   const randomIndex = Math.floor(Math.random() * interviewCovers.length);
   return `/covers${interviewCovers[randomIndex]}`;
 };
+
+// Add type definition at top
+export const getTechLogosList = (techStack: string[]): TechLogo[] => {
+    return techStack.map(tech => {
+        const mapping = Object.entries(mappings).find(([key]) => 
+            key.toLowerCase() === tech.toLowerCase()
+        );
+        
+        const techName = mapping?.[1] || tech;
+        
+        return {
+            name: techName,
+            icon: `/${techName.toLowerCase()}.svg`
+        };
+    });
+}
+
+
